@@ -126,7 +126,11 @@ def idleLoop(client):
             # to avoid this given the current MPD API.
             continue
         currsong = client.currentsong()
-        if currsong['pos'] != prevsong['pos']:
+        if currsong == None or len(currsong) < 1:
+            # handle end of playlist
+            debug("end of playlist detected")
+            playRandomAlbum(client, prevsong['album'])
+        elif currsong['pos'] != prevsong['pos']:
             debug("song change detected: prev: %s curr: %s" % (songInfo(prevsong), songInfo(currsong)))
             if currsong['album'] != prevsong['album']:
                 debug("album changed detected: prev: %s curr: %s" % (prevsong['album'],currsong['album']))
