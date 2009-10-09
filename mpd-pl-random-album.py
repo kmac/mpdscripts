@@ -187,20 +187,6 @@ def goMpd(daemon):
     client.disconnect()
 
 
-def testme():
-    client = mpd.MPDClient()
-    client.connect("localhost", 6600)
-    debug("MPD version: %s" % client.mpd_version)
-    global PASSIVE_MODE
-    PASSIVE_MODE=1
-    albumlist = AlbumList(client)
-    albumlist.refresh()
-    albumlist.playRandomAlbum(None)
-    albumlist.playRandomAlbum(None)
-    albumlist.playRandomAlbum(None)
-    albumlist.printDebugInfo()
-
-
 def main():
     daemon=0
     try:
