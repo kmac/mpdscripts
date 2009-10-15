@@ -116,7 +116,7 @@ class AlbumList:
         if currentsong['pos'] == self._lastsongpos[currentsong['album']]:
             debug("is last song: %s" % songInfo(currentsong))
             return 1
-        debug("NOT last song: %s, last pos: %s" % (songInfo(currentsong), self._lastsongpos[currentsong['album']]))
+        debug("NOT last song: %s, current pos: %s / last pos: %s" % (songInfo(currentsong), currentsong['pos'], self._lastsongpos[currentsong['album']]))
         return 0
 
     def playRandomAlbum(self, currentAlbumName=None):
