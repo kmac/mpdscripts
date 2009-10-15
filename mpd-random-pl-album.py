@@ -36,110 +36,20 @@ Requires:
 """
 
 import getopt
+import logging
 import mpd
 import random
 import sys
 
-DEBUG=1
 PASSIVE_MODE=0
-    
-def debug(str):
-    global DEBUG
-    if DEBUG == 1:
-        print >> sys.stderr, 'DEBUG: %s' % str
 
 def scriptHelp():
     print __doc__
     sys.exit(-1)
 
 def songInfo(song):
-    """ a helper """
+    " a helper to format song info "
     return "[%s-%s-%s]" % (song['track'],song['title'],song['album'])
-
-
-class AlbumList:
-    "Manages album information as queried from MPD"
-    def __init__(self, client):
-        self._client = client
-
-    def _createAlbumList(self, plinfo):
-        "returns a list of albums from the playlist info"
-        self._albums = []
-        for a in plinfo:
-            if a['album'] not in self._albums:
-                self._albums.append(a['album'])
-
-    def _createLastSongList(self, plinfo):
-        " manages the _lastsongpos map, which maintains a last song position for each album "
-        self._lastsongpos = {}
-        for a in self._albums:
-            entries = self._client.playlistfind("album", a)
-            # pick pos from last entry that is returned
-            self._lastsongpos[a] = entries[len(entries)-1]['pos']
-            debug("Last song for album=%s: %s" % (a, songInfo(entries[len(entries)-1])))
-            
-    def _chooseRandomAlbum(self, currentAlbumName):
-        """ picks a random album from the current playlist, doing
-            its best to avoid choosing the current album """
-        if len(self._albums) < 1:
-            debug("No albums found")
-            albumName = currentAlbumName
-        elif len(self._albums) == 1:
-            debug("only one album found: %s" % self._albums)
-            albumName = self._albums[0]
-        else:
-            for i in range(0,3):
-                # pick a random album from the list of album names we've built
-                newalbumindex = random.choice(range(0, len(self._albums) - 1))
-                albumName = self._albums[newalbumindex]
-                # If we've picked the same album as current then
-                # lets keep trying (a few times before giving up)
-                if albumName != currentAlbumName:
-                    break
-        debug("picked album: %s" % (albumName))
-        return albumName
-
-    def refresh(self):
-        " refreshes the album list "
-        plinfo = self._client.playlistinfo()
-        self._createAlbumList(plinfo)
-        self._createLastSongList(plinfo)
-
-    def getAlbumNames(self):
-        " returns list of album names "
-        return self._albums
-
-    def isLastSongInAlbum(self, currentsong):
-        " given a song entry, returns 1 if song is last in album "
-        if currentsong == None or len(currentsong) < 1:
-            return 0
-        if currentsong['pos'] == self._lastsongpos[currentsong['album']]:
-            debug("is last song: %s" % songInfo(currentsong))
-            return 1
-        debug("NOT last song: %s, current pos: %s / last pos: %s" % (songInfo(currentsong), currentsong['pos'], self._lastsongpos[currentsong['album']]))
-        return 0
-
-    def playRandomAlbum(self, currentAlbumName=None):
-        " plays a random album on the current playlist "
-        albumName = self._chooseRandomAlbum(currentAlbumName)
-        if albumName == None:
-            print "ERROR: could not find an album to play"
-            return 0
-        # Look for tracks in album.  They are ordered by position in the playlist.
-        # NOTE: if the playlist is not sorted by album the results may be wonky.
-        entries = self._client.playlistfind("album", albumName)
-        if len(entries) < 1:
-            print "ERROR: could not find album '%s'" % albumName
-            return 0
-        debug("found entry: %s" % entries[0])
-        if not PASSIVE_MODE:
-            # play at the playlist position of the first returned entry
-            self._client.play(entries[0]['pos'])
-        return 1
-
-    def printDebugInfo(self):
-        debug("Albums: %s" % self._albums)
-        debug("Last Song Positions: %s" % self._lastsongpos)
 
 
 def idleLoop(client, albumlist):
@@ -163,20 +73,24 @@ def idleLoop(client, albumlist):
         currsong = client.currentsong()
         if currsong == None or len(currsong) < 1:
             # handle end of playlist
-            debug("end of playlist detected")
+            logging.info("end of playlist detected")
             albumlist.playRandomAlbum(prevsong['album'])
         elif currsong['pos'] != prevsong['pos']:
-            debug("song change detected: prev: %s curr: %s" % (songInfo(prevsong), songInfo(currsong)))
+            logging.debug("song change detected: prev: %s curr: %s" % (songInfo(prevsong), songInfo(currsong)))
             if currsong['album'] != prevsong['album']:
-                debug("album changed detected: prev: %s curr: %s" % (prevsong['album'],currsong['album']))
+                logging.debug("album changed detected: prev: %s curr: %s" % (prevsong['album'],currsong['album']))
                 albumlist.playRandomAlbum(prevsong['album'])
 
 
 def goMpd(daemon):
+    """ 
+        Top-level function, called from main() 
+        Here is where we start to interact with mpd
+    """
     client = mpd.MPDClient()
     client.connect("localhost", 6600)
-    debug("MPD version: %s" % client.mpd_version)
-    #debug("client.commands(): %s" % client.commands())
+    logging.debug("MPD version: %s" % client.mpd_version)
+    #logging.debug("client.commands(): %s" % client.commands())
     albumlist = AlbumList(client)
     albumlist.refresh()
     if daemon:
@@ -196,23 +110,111 @@ def main():
         scriptHelp()
         return 2
     argMode='directory'
+    loglevel = logging.INFO
     for o, a in opts:
-        #debug("o=%s a=%s" % (o, a))
         if o in ("-h", "--help"):
             scriptHelp()
         elif o in ("-D", "--debug"):
-            global DEBUG
-            DEBUG = 1
+            loglevel = logging.DEBUG
         elif o in ("-p", "--passive"):
             global PASSIVE_MODE
             PASSIVE_MODE = 1
         elif o in ("-d", "--daemon"):
             daemon = 1
-    #
+    # configure logging
+    logging.basicConfig(level=loglevel)
     if PASSIVE_MODE:
         print "PASSIVE_MODE: will not change playlist"
     goMpd(daemon)
     return 0
+
+
+class AlbumList:
+    "Manages album information as queried from MPD"
+    def __init__(self, client):
+        self._client = client
+
+    def _createAlbumList(self, plinfo):
+        "returns a list of albums from the playlist info"
+        self._albums = []
+        for a in plinfo:
+            if a['album'] not in self._albums:
+                self._albums.append(a['album'])
+
+    def _createLastSongList(self, plinfo):
+        " manages the _lastsongpos map, which maintains a last song position for each album "
+        self._lastsongpos = {}
+        for a in self._albums:
+            entries = self._client.playlistfind("album", a)
+            # pick pos from last entry that is returned
+            self._lastsongpos[a] = entries[len(entries)-1]['pos']
+            logging.debug("Last song for album=%s: %s" % (a, songInfo(entries[len(entries)-1])))
+            
+    def _chooseRandomAlbum(self, currentAlbumName):
+        """ picks a random album from the current playlist, doing
+            its best to avoid choosing the current album """
+        if len(self._albums) < 1:
+            logging.warn("No albums found")
+            albumName = currentAlbumName
+        elif len(self._albums) == 1:
+            logging.debug("only one album found: %s" % self._albums)
+            albumName = self._albums[0]
+        else:
+            for i in range(0,3):
+                # pick a random album from the list of album names we've built
+                newalbumindex = random.choice(range(0, len(self._albums) - 1))
+                albumName = self._albums[newalbumindex]
+                # If we've picked the same album as current then
+                # lets keep trying (a few times before giving up)
+                if albumName != currentAlbumName:
+                    break
+        logging.info("picked album: %s" % (albumName))
+        return albumName
+
+    def refresh(self):
+        " refreshes the album list "
+        plinfo = self._client.playlistinfo()
+        self._createAlbumList(plinfo)
+        self._createLastSongList(plinfo)
+
+    def getAlbumNames(self):
+        " returns list of album names "
+        return self._albums
+
+    def isLastSongInAlbum(self, currentsong):
+        " given a song entry, returns 1 if song is last in album "
+        if currentsong == None or len(currentsong) < 1:
+            return 0
+        if currentsong['pos'] == self._lastsongpos[currentsong['album']]:
+            logging.info("is last song: %s" % songInfo(currentsong))
+            return 1
+        logging.debug("not last song: %s, current pos: %s / last pos: %s" % (songInfo(currentsong), currentsong['pos'], self._lastsongpos[currentsong['album']]))
+        return 0
+
+    def playRandomAlbum(self, currentAlbumName=None):
+        " plays a random album on the current playlist "
+        albumName = self._chooseRandomAlbum(currentAlbumName)
+        if albumName == None:
+            print "ERROR: could not find an album to play"
+            return 0
+        # Look for tracks in album.  They are ordered by position in the playlist.
+        # NOTE: if the playlist is not sorted by album the results may be wonky.
+        entries = self._client.playlistfind("album", albumName)
+        if len(entries) < 1:
+            print "ERROR: could not find album '%s'" % albumName
+            return 0
+        logging.debug("found entry: %s" % entries[0])
+        if not PASSIVE_MODE:
+            # play at the playlist position of the first returned entry
+            self._client.play(entries[0]['pos'])
+        return 1
+
+    def printDebugInfo(self):
+        print "Albums: %s" % self._albums
+        print "Last Song Positions: %s" % self._lastsongpos
+
+# end of AlbumList class
+
 
 ###############################################################################
 if __name__ == "__main__" or __name__ == "main":
