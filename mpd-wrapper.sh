@@ -1,11 +1,15 @@
 #!/bin/bash
 
+MPD=mpd
+MPDSCRIBBLE=mpdscribble
+MPD_RANDOM_PL_ALBUM=mpd-random-pl-album.py
+
 #if [ ! -f $HOME/.mpd/mpd.pid ]; then
-if [ $(pgrep -x mpd|wc -l) -lt 1 ]; then
-  echo "starting mpd"
-  mpd
+if [ $(pgrep -x $MPD | wc -l) -lt 1 ]; then
+  echo "starting mpd with: $MPD"
+  $MPD
   count=1
-  while [ $(pgrep -x mpd|wc -l) -lt 1 ]; do
+  while [ $(pgrep -x $MPD | wc -l) -lt 1 ]; do
      count=$(($count+1))
      if [ $count -gt 5 ]; then
        echo "mpd did not start!"
@@ -16,12 +20,13 @@ if [ $(pgrep -x mpd|wc -l) -lt 1 ]; then
   done
 fi
 
-if [ $(pgrep -x mpdscribble|wc -l) -lt 1 ]; then
-  echo "starting mpdscribble"
-  mpdscribble
+if [ $(pgrep -x $MPDSCRIBBLE | wc -l) -lt 1 ]; then
+  echo "starting mpdscribble with: $MPDSCRIBBLE"
+  $MPDSCRIBBLE
 fi
 
-if [ $(ps -ef|grep mpd-pl-random-album.py|grep python|grep -v grep|wc -l) -lt 1 ]; then
-  echo "starting mpd-pl-random-album"
-  ($HOME/bin/mpd-pl-random-album.py -d >> /tmp/mpd-pl-random-album.py 2>&1) &
+if [ $(ps -ef | grep $MPD_RANDOM_PL_ALBUM | grep python | grep -v grep | wc -l) -lt 1 ]; then
+  echo "starting mpd-random-pl-album.py with: $MPD_RANDOM_PL_ALBUM"
+  ($MPD_RANDOM_PL_ALBUM -d >> /tmp/mpd-random-pl-album.log 2>&1) &
 fi
+
