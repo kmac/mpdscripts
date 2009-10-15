@@ -1,10 +1,17 @@
 #!/bin/bash
 
+# Variables defining executables (override as needed)
+#
 MPD=mpd
 MPDSCRIBBLE=mpdscribble
-MPD_RANDOM_PL_ALBUM=mpd-random-pl-album.py
 
-#if [ ! -f $HOME/.mpd/mpd.pid ]; then
+# note: you might want to remove the -D (verbose) here:
+MPD_RANDOM_PL_ALBUM="mpd-random-pl-album.py -d -D"
+
+
+# Check for daemons and start if necessary
+#
+
 if [ $(pgrep -x $MPD | wc -l) -lt 1 ]; then
   echo "starting mpd with: $MPD"
   $MPD
@@ -25,8 +32,7 @@ if [ $(pgrep -x $MPDSCRIBBLE | wc -l) -lt 1 ]; then
   $MPDSCRIBBLE
 fi
 
-if [ $(ps -ef | grep $MPD_RANDOM_PL_ALBUM | grep python | grep -v grep | wc -l) -lt 1 ]; then
+if [ $(ps -ef | grep "$MPD_RANDOM_PL_ALBUM" | grep python | grep -v grep | wc -l) -lt 1 ]; then
   echo "starting mpd-random-pl-album.py with: $MPD_RANDOM_PL_ALBUM"
-  ($MPD_RANDOM_PL_ALBUM -d >> /tmp/mpd-random-pl-album.log 2>&1) &
+  ($MPD_RANDOM_PL_ALBUM >> /tmp/mpd-random-pl-album.log 2>&1) &
 fi
-
