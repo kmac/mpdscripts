@@ -33,6 +33,14 @@ Options:
 
 Requires:
    python-mpd
+
+Limitations:
+   The album switching is currently triggered when we hit the last song
+   on an album.  If the user changes the current song selection during
+   the last song on an album then this script will kick in, randomly
+   selecting a new album.  Unfortunately I don't see how to avoid this
+   unless I was to time how long the last song has been playing for, and
+   compare it to the song length given by MPD.
 """
 
 import getopt
