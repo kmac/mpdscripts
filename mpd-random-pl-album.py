@@ -146,8 +146,11 @@ class AlbumList:
         "returns a list of albums from the playlist info"
         self._albums = []
         for a in plinfo:
-            if a['album'] not in self._albums:
-                self._albums.append(a['album'])
+            try:
+                if a['album'] not in self._albums:
+                    self._albums.append(a['album'])
+            except KeyError:
+                logging.debug("createAlbumList, no album key, ignoring entry: %s" % a)
 
     def _createLastSongList(self, plinfo):
         " manages the _lastsongpos map, which maintains a last song position for each album "
