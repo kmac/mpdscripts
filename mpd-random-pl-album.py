@@ -48,6 +48,8 @@ import logging
 import mpd
 import random
 import sys
+import time
+import traceback
 
 PASSIVE_MODE=0
 
@@ -66,42 +68,66 @@ def songInfo(song):
 def idleLoop(client, albumlist):
     """ MPD idle loop.  Used when we're in daemon mode """
     while 1:
-        prevsong = client.currentsong()
-        atlastsong = albumlist.isLastSongInAlbum(prevsong)
-        reasons = client.idle('player','playlist') # blocking
-        if 'playlist' in reasons:
-            # the playlist has changed
-            albumlist.refresh()
-            continue
-        if not atlastsong:
-            # ignore everything unless we were at the last song on the current album.  
-            # This is a hack so that we ignore the user changing the playlist. We're
-            # trying to detect the end of the album.  The hole here is that if the
-            # user changes the current song during the last song on an album then
-            # we'll randomly select a new album for them. Unfortunately I don't see how 
-            # to avoid this given the current MPD API.
-            continue
-        currsong = client.currentsong()
-        if currsong == None or len(currsong) < 1:
-            # handle end of playlist
-            logging.info("end of playlist detected")
-            albumlist.playRandomAlbum(prevsong['album'])
-        elif currsong['pos'] != prevsong['pos']:
-            logging.debug("song change detected: prev: %s curr: %s" % (songInfo(prevsong), songInfo(currsong)))
-            if currsong['album'] != prevsong['album']:
-                logging.debug("album changed detected: prev: %s curr: %s" % (prevsong['album'],currsong['album']))
+        try:
+            time_song_start = time.time()
+            prevsong = client.currentsong()
+            atlastsong = albumlist.isLastSongInAlbum(prevsong)
+            reasons = client.idle('player','playlist') # blocking
+            if 'playlist' in reasons:
+                # the playlist has changed
+                albumlist.refresh()
+                continue
+            if not atlastsong:
+                # ignore everything unless we were at the last song on the current album.  
+                # This is a hack so that we ignore the user changing the playlist. We're
+                # trying to detect the end of the album.  The hole here is that if the
+                # user changes the current song during the last song on an album then
+                # we'll randomly select a new album for them. Unfortunately I don't see how 
+                # to avoid this given the current MPD API.
+                continue
+            currsong = client.currentsong()
+            if currsong == None or len(currsong) < 1:
+                # handle end of playlist
+                logging.info("end of playlist detected")
                 albumlist.playRandomAlbum(prevsong['album'])
+            elif currsong['pos'] != prevsong['pos']:
+                logging.debug("song change detected: prev: %s curr: %s" % (songInfo(prevsong), songInfo(currsong)))
+                if currsong['album'] != prevsong['album']:
+                    # Check that we are at the end of the last
+                    # song. This is to handle the case where the user
+                    # changes the current song when we're at the last
+                    # song in an album
+                    time_elapsed = time.time() - time_song_start
+                    song_length = int(prevsong['time'])
+                    time_diff = song_length - time_elapsed
+                    # if the time_diff is 'small' enough the song ran to completion
+                    # if the time_diff is 'large' then the user probably paused during the song
+                    if abs(time_diff) < 5 or abs(time_diff) > song_length:
+                        logging.debug("album changed detected: prev: %s curr: %s, time_diff: %s-%s=%s" % (prevsong['album'],currsong['album'], song_length, time_elapsed, time_diff))
+                        albumlist.playRandomAlbum(prevsong['album'])
+                    else:
+                        logging.debug("user changed song at end of album.  not selecting a different album, time_diff: %s-%s=%s" % (song_length, time_elapsed, time_diff))
+        except:
+            logging.error("Unexpected error: %s\n%s" % (sys.exc_info()[0], traceback.format_exc()))
+            albumlist.playRandomAlbum()
 
 
-def goMpd(daemon):
+def connectMpd():
     """ 
-        Top-level function, called from main() 
-        Here is where we start to interact with mpd
+        Connect to mpd
     """
     client = mpd.MPDClient()
     client.connect("localhost", 6600)
     logging.debug("MPD version: %s" % client.mpd_version)
     #logging.debug("client.commands(): %s" % client.commands())
+    return client
+
+
+def goMpd(client, daemon):
+    """ 
+        Top-level function, called from main() 
+        Here is where we start to interact with mpd
+    """
     albumlist = AlbumList(client)
     albumlist.refresh()
     if daemon:
@@ -112,16 +138,32 @@ def goMpd(daemon):
     client.disconnect()
 
 
+def mpdInfo(client):
+    """
+        print some basic info obtained from mpd
+    """
+    albumlist = AlbumList(client)
+    albumlist.refresh()
+    print "Album List:\n"
+    albumlist.printDebugInfo()
+    print "\nCurrent Song:\n"
+    currsong = client.currentsong()
+    print(currsong)
+    client.close()
+    client.disconnect()
+
+    
 def main():
     daemon=0
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hDpd", ["help", "debug", "passive", "daemon"])
+        opts, args = getopt.getopt(sys.argv[1:], "hDpdi", ["help", "debug", "passive", "daemon", "info"])
     except getopt.GetoptError:
         # print help information and exit:
         scriptHelp()
         return 2
     argMode='directory'
     loglevel = logging.INFO
+    info = 0
     for o, a in opts:
         if o in ("-h", "--help"):
             scriptHelp()
@@ -130,13 +172,18 @@ def main():
         elif o in ("-p", "--passive"):
             global PASSIVE_MODE
             PASSIVE_MODE = 1
+        elif o in ("-i", "--info"):
+            info = 1
         elif o in ("-d", "--daemon"):
             daemon = 1
     # configure logging
     logging.basicConfig(level=loglevel)
+    client = connectMpd()
     if PASSIVE_MODE:
         print "PASSIVE_MODE: will not change playlist"
-    goMpd(daemon)
+    if info:
+        return mpdInfo(client)
+    goMpd(client, daemon)
     return 0
 
 
@@ -234,6 +281,8 @@ class AlbumList:
 
     def printDebugInfo(self):
         print "Albums: %s" % self._albums
+        #for a in self._albums:
+        #    print a
         print "Last Song Positions: %s" % self._lastsongpos
 
 # end of AlbumList class
