@@ -57,7 +57,10 @@ def scriptHelp():
 
 def songInfo(song):
     " a helper to format song info "
-    return "[%s-%s-%s]" % (song['track'],song['title'],song['album'])
+    try:
+        return "[%s-%s-%s]" % (song['track'],song['title'],song['album'])
+    except:
+        return "[%s-%s]" % (song['artist'],song['album'])
 
 
 def idleLoop(client, albumlist):
