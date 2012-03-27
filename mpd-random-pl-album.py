@@ -57,7 +57,10 @@ def scriptHelp():
 
 def songInfo(song):
     " a helper to format song info "
-    return "[%s-%s-%s]" % (song['track'],song['title'],song['album'])
+    try:
+        return "[%s-%s-%s]" % (song['track'],song['title'],song['album'])
+    except:
+        return "[%s-%s]" % (song['artist'],song['album'])
 
 
 def idleLoop(client, albumlist):
@@ -157,9 +160,18 @@ class AlbumList:
         self._lastsongpos = {}
         for a in self._albums:
             entries = self._client.playlistfind("album", a)
+            
+            # skip if size of entries is zero
+            if len(entries) == 0:
+                continue
+            elif len(entries) == 1:
+                logging.debug("Single file album=%s: %s" % (a, songInfo(entries[-1]))) 
+            else:
+                logging.debug("Last song for album=%s: %s" % (a, songInfo(entries[-1])))
+            
             # pick pos from last entry that is returned
-            self._lastsongpos[a] = entries[len(entries)-1]['pos']
-            logging.debug("Last song for album=%s: %s" % (a, songInfo(entries[len(entries)-1])))
+            self._lastsongpos[a] = entries[-1]['pos']
+            
             
     def _chooseRandomAlbum(self, currentAlbumName):
         """ picks a random album from the current playlist, doing
