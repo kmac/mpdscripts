@@ -1,7 +1,7 @@
 mpdscripts
 ==========
 
-MPD scripts
+Some scripts to interact with MPD.
 
 
 mpd-random-pl-album.py
@@ -53,12 +53,12 @@ Limitations:
 Examples
 --------
 
-1. Select a new album to play from the current playlist:
+Select a new album to play from the current playlist:
 ```
  ./mpd-random-pl-album.py
 ```
 
-2. Start a daemon, logging output to /tmp/mpd-random-pl-album.log
+Start a daemon, logging output to /tmp/mpd-random-pl-album.log
 ```
 (./mpd-random-pl-album.py -d > /tmp/mpd-random-pl-album.log 2>&1 ) &
 ```
