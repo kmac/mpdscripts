@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 #    This script picks a random album from the MPD playlist.
 #    Copyright (C) 2009  Kyle MacLeod  kyle.macleod is at gmail
@@ -17,6 +17,8 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
+Description
+-----------
 This script picks a random album from the MPD playlist.  Called with no
 args it will choose the first song from a random album on the current playlist
 and start playing from that point. Obviously, this only works if the playlist
@@ -33,7 +35,7 @@ Options:
    -D|--debug   : Print debug messages to stdout
    -p|--passive : testing only. Don't make any changes to the MPD playlist
 
-Requires:
+Dependencies:
    python-mpd
 
 Limitations:
@@ -43,14 +45,25 @@ Limitations:
    selecting a new album.  Unfortunately I don't see how to avoid this
    unless we were to time how long the last song has been playing for, and
    compare it to the song length given by MPD.
+
+Other Usage Notes:
+-----------------
+mpd.norandom file
+When file <TEMPDIR>/mpd.norandom exists, the script does not perform album selection.
+You can use this to temporarily override the functionality when the script is running
+in daemon mode.
+
+e.g. touch /tmp/mpd.norandom
 """
 
 import getopt
 import logging
 import mpd
 import os
+import os.path
 import random
 import sys
+import tempfile
 import time
 import traceback
 
@@ -59,7 +72,7 @@ PASSIVE_MODE = False
 
 # If this file exists then no random album is chosen. Used to easily disable the daemon
 # e.g. touch /tmp/mpd.norandom && sleep 3600 && rm -f /tmp/mpd.norandom
-SUSPEND_FILENAME = '/tmp/mpd.norandom'
+SUSPEND_FILENAME = os.path.join(tempfile.gettempdir(), 'mpd.norandom')
 
 
 def script_help():
