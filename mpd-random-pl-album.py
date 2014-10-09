@@ -18,15 +18,17 @@
 
 """
 This script picks a random album from the MPD playlist.  Called with no
-args it will pick a random album from the current playlist and start
-playing.
+args it will choose the first song from a random album on the current playlist
+and start playing from that point. Obviously, this only works if the playlist
+is arranged as a list of albums. It's meant to provide a rudimentary album
+shuffle function for MPD.
 
-It can also monitor MPD and select a new album in the playlist after the
-last song on an album has ended. Use the -d option
+In daemon mode the script will monitor MPD and select a new album
+in the playlist after the last song on an album has ended (see -d option).
 
 Options:
    -h|--help
-   -d|--daemon  : daemon.  Monitor MPD for track changes. At end of album select
+   -d|--daemon  : daemon mode. Monitor MPD for track changes. At end of album select
                   a new random album from the playlist
    -D|--debug   : Print debug messages to stdout
    -p|--passive : testing only. Don't make any changes to the MPD playlist
@@ -35,8 +37,8 @@ Requires:
    python-mpd
 
 Limitations:
-   The album switching is currently triggered when we hit the last song
-   on an album.  If the user changes the current song selection during
+   The album switching is currently triggered when the last song on an album
+   is reached.  If the user changes the current song selection during
    the last song on an album then this script will kick in, randomly
    selecting a new album.  Unfortunately I don't see how to avoid this
    unless we were to time how long the last song has been playing for, and
@@ -52,18 +54,22 @@ import sys
 import time
 import traceback
 
+# This is used for testing purposes
 PASSIVE_MODE = False
 
 # If this file exists then no random album is chosen. Used to easily disable the daemon
 # e.g. touch /tmp/mpd.norandom && sleep 3600 && rm -f /tmp/mpd.norandom
 SUSPEND_FILENAME = '/tmp/mpd.norandom'
 
+
 def script_help():
     print __doc__
     sys.exit(-1)
 
+
 def song_info(song):
-    " a helper to format song info "
+    """A helper to format song info.
+    """
     try:
         return "[%s-%s-%s]" % (song['track'],song['title'],song['album'])
     except:
@@ -71,7 +77,8 @@ def song_info(song):
 
 
 def idle_loop(client, albumlist):
-    """ MPD idle loop.  Used when we're in daemon mode """
+    """MPD idle loop.  Used when we're in daemon mode.
+    """
     time_song_start = time.time()
     while 1:
         try:
@@ -118,8 +125,7 @@ def idle_loop(client, albumlist):
 
 
 def connect_mpd():
-    """
-        Connect to mpd
+    """Connect to mpd.
     """
     client = mpd.MPDClient()
     mpd_passwd = None
@@ -143,9 +149,7 @@ def connect_mpd():
 
 
 def go_mpd(client, daemon):
-    """
-        Top-level function, called from main()
-        Here is where we start to interact with mpd
+    """Top-level function, called from main(). Here is where we start to interact with mpd.
     """
     albumlist = AlbumList(client)
     albumlist.refresh()
@@ -158,8 +162,7 @@ def go_mpd(client, daemon):
 
 
 def mpd_info(client):
-    """
-        print some basic info obtained from mpd
+    """Print some basic info obtained from mpd.
     """
     albumlist = AlbumList(client)
     albumlist.refresh()
@@ -206,12 +209,13 @@ def main():
 
 
 class AlbumList:
-    "Manages album information as queried from MPD"
+    """Manages album information as queried from MPD.
+    """
     def __init__(self, client):
         self._client = client
 
     def _create_album_list(self, plinfo):
-        "returns a list of albums from the playlist info"
+        """Returns a list of albums from the playlist info."""
         self._albums = []
         for a in plinfo:
             try:
@@ -221,25 +225,27 @@ class AlbumList:
                 logging.debug("createAlbumList, no album key, ignoring entry: %s" % a)
 
     def _create_last_song_list(self, plinfo):
-        " manages the _lastsongpos map, which maintains a last song position for each album "
-        self._lastsongpos = {}
+        """Manages the _last_song_pos map, which maintains a last song position for each album.
+        """
+        self._last_song_pos = {}
         for a in self._albums:
             entries = self._client.playlistfind("album", a)
-            
+
             # skip if size of entries is zero
             if len(entries) == 0:
                 continue
             elif len(entries) == 1:
-                logging.debug("Single file album=%s: %s" % (a, songInfo(entries[-1]))) 
+                logging.debug("Single file album=%s: %s" % (a, song_info(entries[-1])))
             else:
-                logging.debug("Last song for album=%s: %s" % (a, songInfo(entries[-1])))
-            
+                logging.debug("Last song for album=%s: %s" % (a, song_info(entries[-1])))
+
             # pick pos from last entry that is returned
-            self._lastsongpos[a] = entries[-1]['pos']
+            self._last_song_pos[a] = entries[-1]['pos']
 
     def _choose_random_album(self, current_album_name):
-        """ picks a random album from the current playlist, doing
-            its best to avoid choosing the current album """
+        """Picks a random album from the current playlist, doing its best to avoid choosing
+        the current album.
+        """
         if len(self._albums) < 1:
             logging.warn("No albums found")
             album_name = current_album_name
@@ -259,30 +265,34 @@ class AlbumList:
         return album_name
 
     def refresh(self):
-        " refreshes the album list "
+        """Refreshes the album list.
+        """
         plinfo = self._client.playlistinfo()
         self._create_album_list(plinfo)
         self._create_last_song_list(plinfo)
 
     def get_album_names(self):
-        " returns list of album names "
+        """Returns list of album names.
+        """
         return self._albums
 
     def is_last_song_in_album(self, currentsong):
-        " given a song entry, returns 1 if song is last in album "
+        """Given a song entry, returns 1 if song is last in album.
+        """
         if currentsong == None or len(currentsong) < 1:
             return False
         if 'album' not in currentsong:
             logging.info("current song has no album, ignoring: %s" % currentsong)
             return False
-        if currentsong['pos'] == self._lastsongpos[currentsong['album']]:
+        if currentsong['pos'] == self._last_song_pos[currentsong['album']]:
             logging.info("is last song: %s" % song_info(currentsong))
             return True
-        logging.debug("not last song: %s, current pos: %s / last pos: %s" % (song_info(currentsong), currentsong['pos'], self._lastsongpos[currentsong['album']]))
+        logging.debug("not last song: %s, current pos: %s / last pos: %s" % (song_info(currentsong), currentsong['pos'], self._last_song_pos[currentsong['album']]))
         return False
 
     def play_random_album(self, current_album_name=None):
-        " plays a random album on the current playlist "
+        """Plays a random album on the current playlist.
+        """
         if os.path.exists(SUSPEND_FILENAME):
             logging.info("Suspended by presence of %s, not choosing random album" % SUSPEND_FILENAME)
             return
@@ -303,11 +313,7 @@ class AlbumList:
 
     def print_debug_info(self):
         print "Albums: %s" % self._albums
-        #for a in self._albums:
-        #    print a
-        print "Last Song Positions: %s" % self._lastsongpos
-
-# end of AlbumList class
+        print "Last Song Positions: %s" % self._last_song_pos
 
 
 ###############################################################################
