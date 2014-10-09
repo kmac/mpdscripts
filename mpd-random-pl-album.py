@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 #    This script picks a random album from the MPD playlist.
 #    Copyright (C) 2009  Kyle MacLeod  kyle.macleod is at gmail
@@ -236,7 +236,6 @@ class AlbumList:
             
             # pick pos from last entry that is returned
             self._lastsongpos[a] = entries[-1]['pos']
-            logging.debug("Last song for album=%s: %s" % (a, song_info(entries[len(entries)-1])))
 
     def _choose_random_album(self, current_album_name):
         """ picks a random album from the current playlist, doing
