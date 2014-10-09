@@ -67,15 +67,18 @@ Start a daemon, logging output to /tmp/mpd-random-playlist-album.log
 gmusic-fetch-playlist.py
 ========================
 
-A python script which retrieves .m3u playlists via GMusicProxy (https://github.com/diraimondo/gmusicproxy),
-optionally loading the playlist into the current MPD playlist.
+A python script for Google Play Music which retrieves .m3u playlists via GMusicProxy
+(https://github.com/diraimondo/gmusicproxy), optionally loading the playlist into
+the current MPD playlist.
+
 This script is basically just a helper for GMusicProxy.
 
 
 From the help:
 ```
-This script fetches playlists using GMusicProxy (https://github.com/diraimondo/gmusicproxy)
-and optionally adds to current MPD playlist.
+A python script for Google Play Music which retrieves .m3u playlists via GMusicProxy
+(https://github.com/diraimondo/gmusicproxy), optionally loading the playlist into
+the current MPD playlist.
 
 Usage
 -----
@@ -103,7 +106,7 @@ Retrieve all playlists:
 Dependencies
 ------------
 GMusicProxy
-Google Music
+python-requests
 mpc
 
 

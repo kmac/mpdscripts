@@ -1,7 +1,25 @@
 #!/usr/bin/env python2
+
+#    This script fetches playlists using GMusicProxy (https://github.com/diraimondo/gmusicproxy)
+#    Copyright (C) 2014  Kyle MacLeod  kyle.macleod is at gmail
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 '''
-This script fetches playlists using GMusicProxy (https://github.com/diraimondo/gmusicproxy)
-and optionally adds to current MPD playlist.
+A python script for Google Play Music which retrieves .m3u playlists via GMusicProxy
+(https://github.com/diraimondo/gmusicproxy), optionally loading the playlist into
+the current MPD playlist.
 
 Usage
 -----
@@ -29,8 +47,8 @@ Retrieve all playlists:
 Dependencies
 ------------
 GMusicProxy
-Google Music
 mpc
+python-requests
 
 
 Configuration
@@ -78,7 +96,7 @@ CONFIG = {
 DEBUG = False
 
 class Usage(Exception):
-    def __init__(self, msg='', include_doc=True):
+    def __init__(self, msg='', include_doc=False):
         if msg is None:
             msg = ''
         self.msg = msg
@@ -149,9 +167,9 @@ def fetch_playlist(url, to_filename, args):
 
 def get_album_playlist(args):
     if args['artist'] is None:
-        raise Usage('artist is required (use -h for help)')
+        raise Usage('ERROR: artist is required')
     if args['title'] is None:
-        raise Usage('album is required (use -h for help)')
+        raise Usage('ERROR: album is required')
     #curl -s $CONFIG['gmusic-proxy-url']/'get_by_search?type=album&artist=Alt-J&title=An%20Awesome%20Wave' > $HOME/.mpd/playlists/'Alt-J - An Awesome Wave.m3u'
     url = '%s/get_by_search?type=album&artist=%s&title=%s' % (CONFIG['gmusic-proxy-url'], args['artist'], args['title'])
     to_filename = os.path.join(CONFIG['mpd-playlist-dir'], '%salbum-%s-%s.m3u' % (CONFIG['playlist-prefix'], args['artist'], args['title']))
@@ -207,7 +225,7 @@ def main(argv=None):
             raise Usage(msg, False)
         for o, a in opts:
             if o in ("-h", "--help"):
-                raise Usage()
+                raise Usage(None, True)
             elif o in ("-a", "--artist"):
                 processed_args['artist'] = a
                 argv.remove(o)
@@ -240,7 +258,7 @@ def main(argv=None):
 
     except Usage, err:
         print >>sys.stderr, err.msg
-        print >>sys.stderr, "for help use --help"
+        print >>sys.stderr, "[for help use -h or --help]"
         return 2
 
 
