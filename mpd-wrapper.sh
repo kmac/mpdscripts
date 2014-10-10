@@ -6,7 +6,7 @@ MPD=mpd
 MPDSCRIBBLE=mpdscribble
 
 # note: you might want to remove the -D (verbose) here:
-MPD_RANDOM_PL_ALBUM="mpd-random-pl-album.py -d -D"
+MPD_RANDOM_PLAYLIST_ALBUM="mpd-random-playlist-album.py -d -D"
 
 
 # Check for daemons and start if necessary
@@ -32,7 +32,7 @@ if [ $(pgrep -x $MPDSCRIBBLE | wc -l) -lt 1 ]; then
   $MPDSCRIBBLE
 fi
 
-if [ $(ps -ef | grep "$MPD_RANDOM_PL_ALBUM" | grep python | grep -v grep | wc -l) -lt 1 ]; then
-  echo "starting mpd-random-pl-album.py with: $MPD_RANDOM_PL_ALBUM"
-  ($MPD_RANDOM_PL_ALBUM >> /tmp/mpd-random-pl-album.log 2>&1) &
+if [ $(ps -ef | grep "$MPD_RANDOM_PLAYLIST_ALBUM" | grep python | grep -v grep | wc -l) -lt 1 ]; then
+  echo "starting mpd-random-playlist-album.py with: $MPD_RANDOM_PLAYLIST_ALBUM"
+  ($MPD_RANDOM_PLAYLIST_ALBUM >> /tmp/mpd-random-playlist-album.log 2>&1) &
 fi
