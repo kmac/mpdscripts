@@ -16,15 +16,14 @@ then run this script as a daemon. When one album finishes, a new album will be c
 Similar to Amarok's album shuffle mode or foobar2000's random album mode.
 
 
-Depends: python-mpd
+The following is taken from the help:
 
-
-From the help:
-```
+Description
+-----------
 This script picks a random album from the MPD playlist.  Called with no
 args it will choose the first song from a random album on the current playlist
 and start playing from that point. Obviously, this only works if the playlist
-is arranged as a list of albums. It's meant to provide a rudimentary album
+is arranged as a list of albums. It's meant to provide a rudimentary album-level
 shuffle function for MPD.
 
 In daemon mode the script will monitor MPD and select a new album
@@ -32,13 +31,13 @@ in the playlist after the last song on an album has ended (see -d option).
 
 Options:
    -h|--help
-   -d|--daemon  : daemon mode. Monitor MPD for track changes. At end of album select
+   -d|--daemon  : Daemon mode. Monitors MPD for track changes. At end of album selects
                   a new random album from the playlist
    -D|--debug   : Print debug messages to stdout
-   -p|--passive : testing only. Don't make any changes to the MPD playlist
+   -p|--passive : Testing only. Does not make any changes to the MPD playlist.
 
-Requires:
-   python-mpd
+Dependencies:
+   python2-mpd  : still using the python2 mpd library (for now)
 
 Limitations:
    The album switching is currently triggered when the last song on an album
@@ -47,18 +46,44 @@ Limitations:
    selecting a new album.  Unfortunately I don't see how to avoid this
    unless we were to time how long the last song has been playing for, and
    compare it to the song length given by MPD.
-```
+
+Usage Notes:
+------------
+
+### Album Queue
+
+This is a way to queue up individual albums to be played in order.  You can put
+album titles in <TEMPDIR/mpd.albumq, one line per album.  Album names are
+consumed as a queue, until the file is empty, after which the selector will
+revert back to random. 
+
+By default, the given album string matches the first album against any
+substring in the playlist album names (case-sensitive). For an exact match,
+prefix the album name with a '!'.
+
+An example /tmp/mpd.albumq:
+
+    Abbey Road
+    !Movement (Remastered)
+
+
+### mpd.norandom file
+
+When file <TEMPDIR>/mpd.norandom exists, the script does not perform album selection.
+
+You can use this to temporarily override the functionality when the script is running
+in daemon mode. e.g.:
+
+    touch /tmp/mpd.norandom
 
 
 Examples
 --------
 
 Select a new album to play from the current playlist:
-```
- ./mpd-random-playlist-album.py
-```
+
+    ./mpd-random-playlist-album.py
 
 Start a daemon, logging output to /tmp/mpd-random-playlist-album.log
-```
-(./mpd-random-playlist-album.py -d > /tmp/mpd-random-playlist-album.log 2>&1 ) &
-```
+
+    (./mpd-random-playlist-album.py -d > /tmp/mpd-random-playlist-album.log 2>&1 ) &
