@@ -30,22 +30,25 @@ In daemon mode the script will monitor MPD and select a new album
 in the playlist after the last song on an album has ended (see -d option).
 
 Options:
-   -h|--help
-   -d|--daemon  : Daemon mode. Monitors MPD for track changes. At end of album selects
-                  a new random album from the playlist
-   -D|--debug   : Print debug messages to stdout
-   -p|--passive : Testing only. Does not make any changes to the MPD playlist.
+
+    -h|--help
+    -d|--daemon  : Daemon mode. Monitors MPD for track changes. At end of album selects
+                   a new random album from the playlist
+    -D|--debug   : Print debug messages to stdout
+    -p|--passive : Testing only. Does not make any changes to the MPD playlist.
 
 Dependencies:
-   python2-mpd  : still using the python2 mpd library (for now)
+
+* python2-mpd  : still using the python2 mpd library (for now)
 
 Limitations:
-   The album switching is currently triggered when the last song on an album
-   is reached.  If the user changes the current song selection during
-   the last song on an album then this script will kick in, randomly
-   selecting a new album.  Unfortunately I don't see how to avoid this
-   unless we were to time how long the last song has been playing for, and
-   compare it to the song length given by MPD.
+
+* The album switching is currently triggered when the last song on an album is
+  reached.  If the user changes the current song selection during the last song
+  on an album then this script will kick in, randomly selecting a new album.
+  Unfortunately I don't see how to avoid this unless we were to time how long the
+  last song has been playing for, and compare it to the song length given by MPD.  
+
 
 Usage Notes:
 ------------
@@ -53,7 +56,7 @@ Usage Notes:
 ### Album Queue
 
 This is a way to queue up individual albums to be played in order.  You can put
-album titles in <TEMPDIR/mpd.albumq, one line per album.  Album names are
+album titles in /tmp/mpd.albumq, one line per album.  Album names are
 consumed as a queue, until the file is empty, after which the selector will
 revert back to random. 
 
@@ -69,7 +72,7 @@ An example /tmp/mpd.albumq:
 
 ### mpd.norandom file
 
-When file <TEMPDIR>/mpd.norandom exists, the script does not perform album selection.
+When file /tmp/mpd.norandom exists, the script does not perform album selection.
 
 You can use this to temporarily override the functionality when the script is running
 in daemon mode. e.g.:
@@ -87,3 +90,5 @@ Select a new album to play from the current playlist:
 Start a daemon, logging output to /tmp/mpd-random-playlist-album.log
 
     (./mpd-random-playlist-album.py -d > /tmp/mpd-random-playlist-album.log 2>&1 ) &
+
+

@@ -29,22 +29,25 @@ In daemon mode the script will monitor MPD and select a new album
 in the playlist after the last song on an album has ended (see -d option).
 
 Options:
-   -h|--help
-   -d|--daemon  : Daemon mode. Monitors MPD for track changes. At end of album selects
-                  a new random album from the playlist
-   -D|--debug   : Print debug messages to stdout
-   -p|--passive : Testing only. Does not make any changes to the MPD playlist.
+
+    -h|--help
+    -d|--daemon  : Daemon mode. Monitors MPD for track changes. At end of album selects
+                   a new random album from the playlist
+    -D|--debug   : Print debug messages to stdout
+    -p|--passive : Testing only. Does not make any changes to the MPD playlist.
 
 Dependencies:
-   python2-mpd  : still using the python2 mpd library (for now)
+
+* python2-mpd  : still using the python2 mpd library (for now)
 
 Limitations:
-   The album switching is currently triggered when the last song on an album
-   is reached.  If the user changes the current song selection during
-   the last song on an album then this script will kick in, randomly
-   selecting a new album.  Unfortunately I don't see how to avoid this
-   unless we were to time how long the last song has been playing for, and
-   compare it to the song length given by MPD.
+
+* The album switching is currently triggered when the last song on an album is
+  reached.  If the user changes the current song selection during the last song
+  on an album then this script will kick in, randomly selecting a new album.
+  Unfortunately I don't see how to avoid this unless we were to time how long the
+  last song has been playing for, and compare it to the song length given by MPD.  
+
 
 Usage Notes:
 ------------
