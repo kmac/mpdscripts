@@ -54,9 +54,11 @@ Usage Notes:
 
 ### Album Queue
 
-This is a way to queue up individual albums to be played in order.  You can put
-album titles in /tmp/mpd.albumq, one line per album.  Album names are
-consumed as a queue, until the file is empty, after which the selector will
+A file specified by environment variable MPD_RANDOM_ALBUM_QUEUE_FILE [default=/tmp/mpd.albumq]
+can be used to enqueue individual albums to be played in order.  
+
+Put album titles to be enqueued in $MPD_RANDOM_ALBUM_QUEUE_FILE, one line per album.
+Album names are consumed as a queue, until the file is empty, after which the selector will
 revert back to random. 
 
 By default, the given album string matches the first album against any
@@ -69,12 +71,13 @@ An example /tmp/mpd.albumq:
     !Movement (Remastered)
 
 
-### mpd.norandom file
+### Temporarily Suspend (mpd.norandom file)
 
-When file /tmp/mpd.norandom exists, the script does not perform album selection.
+When the file specified by environment variable MPD_RANDOM_SUSPEND_FILE [default=/tmp/mpd.norandom]
+is created, then this script ignores album changes. 
 
-You can use this to temporarily override the functionality when the script is running
-in daemon mode. e.g.:
+You can use this to temporarily override album selection when the script is
+running in daemon mode. e.g.:
 
     touch /tmp/mpd.norandom
 
@@ -104,14 +107,18 @@ import traceback
 
 # If this file exists then no random album is chosen. Used to easily disable the daemon
 # e.g. touch /tmp/mpd.norandom && sleep 3600 && rm -f /tmp/mpd.norandom
-SUSPEND_FILENAME = os.path.join(tempfile.gettempdir(), 'mpd.norandom')
+MPD_RANDOM_SUSPEND_FILE = os.getenv('MPD_RANDOM_SUSPEND_FILE')
+if MPD_RANDOM_SUSPEND_FILE is None:
+    MPD_RANDOM_SUSPEND_FILE = os.path.join(tempfile.gettempdir(), 'mpd.norandom')
 
 # Album queue file. This file contains any number of lines. When an album is selected
 # lines are processed in order; any match against the album names in the current playlist
 # cause that album to be selected next. Lines are consumed as processed until the file is
 # empty, after which the file is deleted.
-#ALBUM_QUEUE_FILENAME = os.path.join(os.getenv('HOME'), '.mpd', 'mpd.albumq')
-ALBUM_QUEUE_FILENAME = os.path.join(tempfile.gettempdir(), 'mpd.albumq')
+#MPD_RANDOM_ALBUM_QUEUE_FILE = os.path.join(os.getenv('HOME'), '.mpd', 'mpd.albumq')
+MPD_RANDOM_ALBUM_QUEUE_FILE = os.getenv('MPD_RANDOM_ALBUM_QUEUE_FILE')
+if MPD_RANDOM_ALBUM_QUEUE_FILE is None:
+    MPD_RANDOM_ALBUM_QUEUE_FILE = os.path.join(tempfile.gettempdir(), 'mpd.albumq')
 
 # This is used for testing purposes
 PASSIVE_MODE = False
@@ -136,14 +143,20 @@ def idle_loop(client, albumlist):
     """
     time_song_start = time.time()
     while 1:
+        logging.debug("idle_loop: current song: {}".format(client.currentsong()))
         try:
             prevsong = client.currentsong()
             at_last_song = albumlist.is_last_song_in_album(prevsong)
             reasons = client.idle('player','playlist') # blocking
-            if 'playlist' in reasons:
+            logging.debug("response from client.idle: {}".format(str(reasons)))
+
+            # streams come in with ['playlist', 'player'] on song change
+            # we only want to refresh the albumlist if only the playlist has changed:
+            if len(reasons) == 1 and 'playlist' in reasons:
                 # the playlist has changed
                 albumlist.refresh()
                 continue
+
             if not at_last_song:
                 # Ignore everything unless we were at the last song on the current album.
                 # This is a hack so that we ignore the user changing the playlist. We're
@@ -152,6 +165,7 @@ def idle_loop(client, albumlist):
                 # we'll randomly select a new album for them. Unfortunately I don't see how
                 # to avoid this given the current MPD API.
                 continue
+
             currsong = client.currentsong()
             if currsong == None or len(currsong) < 1:
                 # handle end of playlist
@@ -177,6 +191,7 @@ def idle_loop(client, albumlist):
                         albumlist.play_next_album(prevsong['album'])
                 # update the start time for the next song
                 time_song_start = time.time()
+
         except:
             logging.error("Unexpected error: {0}\n{1}".format(sys.exc_info()[0], traceback.format_exc()))
             albumlist.play_next_album()
@@ -206,12 +221,12 @@ def connect_mpd():
     return client
 
 
-def go_mpd(client, daemon):
+def go_mpd(client, is_daemon):
     """Top-level function, called from main(). Here is where we start to interact with mpd.
     """
     albumlist = AlbumList(client)
     albumlist.refresh()
-    if daemon:
+    if is_daemon:
         idle_loop(client, albumlist)
     else:
         albumlist.play_next_album()
@@ -234,35 +249,35 @@ def mpd_info(client):
 
 
 def main():
-    daemon=0
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hDpdi", ["help", "debug", "passive", "daemon", "info"])
     except getopt.GetoptError:
         # print help information and exit:
         script_help()
         return 2
-    loglevel = logging.INFO
-    info = 0
+    arg_daemon=False
+    arg_loglevel = logging.INFO
+    arg_info = False
     for o, a in opts:
         if o in ("-h", "--help"):
             script_help()
         elif o in ("-D", "--debug"):
-            loglevel = logging.DEBUG
+            arg_loglevel = logging.DEBUG
         elif o in ("-p", "--passive"):
             global PASSIVE_MODE
             PASSIVE_MODE = True
         elif o in ("-i", "--info"):
-            info = 1
+            arg_info = True
         elif o in ("-d", "--daemon"):
-            daemon = 1
+            arg_daemon = True
     # configure logging
-    logging.basicConfig(level=loglevel)
+    logging.basicConfig(level=arg_loglevel)
     client = connect_mpd()
     if PASSIVE_MODE:
         print("PASSIVE_MODE: will not change playlist")
-    if info:
+    if arg_info:
         return mpd_info(client)
-    go_mpd(client, daemon)
+    go_mpd(client, arg_daemon)
     return 0
 
 
@@ -271,8 +286,8 @@ class AlbumList:
     """
     def __init__(self, client):
         self._client = client
-        if not os.path.exists(ALBUM_QUEUE_FILENAME):
-            logging.info("Creating album queue file '{0}'".format(ALBUM_QUEUE_FILENAME))
+        if not os.path.exists(MPD_RANDOM_ALBUM_QUEUE_FILE):
+            logging.info("Creating album queue file '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
             self._write_album_queue([])
 
     def _create_album_list(self, plinfo):
@@ -327,18 +342,18 @@ class AlbumList:
 
     def _write_album_queue(self, album_q_list):
         """Writes the given album queue to file. Will write an empty file if list is empty."""
-        logging.debug("Album queue: writing '{0}'".format(ALBUM_QUEUE_FILENAME))
-        with open(ALBUM_QUEUE_FILENAME, 'w') as f:
+        logging.debug("Album queue: writing '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
+        with open(MPD_RANDOM_ALBUM_QUEUE_FILE, 'w') as f:
             for l in album_q_list:
                 f.write(l)
 
     def _process_album_queue(self):
         """Process the album queue file. Selects a matching album from the queue, or returns None if not found."""
-        if not os.path.exists(ALBUM_QUEUE_FILENAME):
-            logging.warn("Album queue file does not exist '{0}'".format(ALBUM_QUEUE_FILENAME))
+        if not os.path.exists(MPD_RANDOM_ALBUM_QUEUE_FILE):
+            logging.warn("Album queue file does not exist '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
             return None
-        logging.info("Album queue: Scanning '{0}'".format(ALBUM_QUEUE_FILENAME))
-        with open(ALBUM_QUEUE_FILENAME) as f:
+        logging.info("Album queue: Scanning '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
+        with open(MPD_RANDOM_ALBUM_QUEUE_FILE) as f:
             album_q_list = f.readlines()
         if len(album_q_list) < 1:
             return None
@@ -359,7 +374,7 @@ class AlbumList:
                             return album_name
         finally:
             self._write_album_queue(album_q_list)
-        logging.info("Album queue: No matching album found from '{0}'".format(ALBUM_QUEUE_FILENAME))
+        logging.info("Album queue: No matching album found from '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
         return None
 
     def refresh(self):
@@ -398,8 +413,8 @@ class AlbumList:
     def play_next_album(self, current_album_name=None):
         """Plays a random album on the current playlist.
         """
-        if os.path.exists(SUSPEND_FILENAME):
-            logging.info("Suspended by presence of {0}, not choosing next album".format(SUSPEND_FILENAME))
+        if os.path.exists(MPD_RANDOM_SUSPEND_FILE):
+            logging.info("Suspended by presence of {0}, not choosing next album".format(MPD_RANDOM_SUSPEND_FILE))
             return
         # choose next album, either by album queue or random
         album_name = self._process_album_queue()
