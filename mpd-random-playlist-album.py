@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 #    This script picks a random album from the MPD playlist.
 #    Copyright (C) 2009  Kyle MacLeod  kyle.macleod is at gmail
@@ -46,7 +46,7 @@ Limitations:
   reached.  If the user changes the current song selection during the last song
   on an album then this script will kick in, randomly selecting a new album.
   Unfortunately I don't see how to avoid this unless we were to time how long the
-  last song has been playing for, and compare it to the song length given by MPD.  
+  last song has been playing for, and compare it to the song length given by MPD.
 
 
 Usage Notes:
@@ -55,11 +55,11 @@ Usage Notes:
 ### Album Queue
 
 A file specified by environment variable MPD_RANDOM_ALBUM_QUEUE_FILE [default=/tmp/mpd.albumq]
-can be used to enqueue individual albums to be played in order.  
+can be used to enqueue individual albums to be played in order.
 
 Put album titles to be enqueued in $MPD_RANDOM_ALBUM_QUEUE_FILE, one line per album.
 Album names are consumed as a queue, until the file is empty, after which the selector will
-revert back to random. 
+revert back to random.
 
 By default, the given album string matches the first album against any
 substring in the playlist album names (case-sensitive). For an exact match,
@@ -74,7 +74,7 @@ An example /tmp/mpd.albumq:
 ### Temporarily Suspend (mpd.norandom file)
 
 When the file specified by environment variable MPD_RANDOM_SUSPEND_FILE [default=/tmp/mpd.norandom]
-is created, then this script ignores album changes. 
+is created, then this script ignores album changes.
 
 You can use this to temporarily override album selection when the script is
 running in daemon mode. e.g.:
@@ -115,10 +115,20 @@ if MPD_RANDOM_SUSPEND_FILE is None:
 # lines are processed in order; any match against the album names in the current playlist
 # cause that album to be selected next. Lines are consumed as processed until the file is
 # empty, after which the file is deleted.
-#MPD_RANDOM_ALBUM_QUEUE_FILE = os.path.join(os.getenv('HOME'), '.mpd', 'mpd.albumq')
 MPD_RANDOM_ALBUM_QUEUE_FILE = os.getenv('MPD_RANDOM_ALBUM_QUEUE_FILE')
 if MPD_RANDOM_ALBUM_QUEUE_FILE is None:
-    MPD_RANDOM_ALBUM_QUEUE_FILE = os.path.join(tempfile.gettempdir(), 'mpd.albumq')
+    if os.path.exists(os.path.join(os.getenv('HOME'), '.config', 'mpd')):
+        MPD_RANDOM_ALBUM_QUEUE_FILE = os.path.join(os.getenv('HOME'), '.config', 'mpd', 'mpd.albumq')
+    elif os.path.exists(os.path.join(os.getenv('HOME'), '.mpd')):
+        MPD_RANDOM_ALBUM_QUEUE_FILE = os.path.join(os.getenv('HOME'), '.mpd', 'mpd.albumq')
+    else:
+        MPD_RANDOM_ALBUM_QUEUE_FILE = os.path.join(tempfile.gettempdir(), 'mpd.albumq')
+
+# The archive file, derived from the album queue file. Maintains a history of the albumq. 
+# Set to '' via environment variable to disable.
+MPD_RANDOM_ALBUM_QUEUE_ARCHIVE_FILE = os.getenv('MPD_RANDOM_ALBUM_QUEUE_ARCHIVE_FILE')
+if MPD_RANDOM_ALBUM_QUEUE_ARCHIVE_FILE is None:
+    MPD_RANDOM_ALBUM_QUEUE_ARCHIVE_FILE = MPD_RANDOM_ALBUM_QUEUE_FILE + '.archive'
 
 # This is used for testing purposes
 PASSIVE_MODE = False
@@ -133,9 +143,9 @@ def song_info(song):
     """A helper to format song info.
     """
     try:
-        return "[{0}-{1}-{2}]".format(song['track'], song['title'], song['album'])
+        return "[{}-{}-{}]".format(song['track'], song['title'], song['album'])
     except:
-        return "[{0}-{1}]".format(song['artist'], song['album'])
+        return "[{}-{}]".format(song['artist'], song['album'])
 
 
 def idle_loop(client, albumlist):
@@ -172,7 +182,7 @@ def idle_loop(client, albumlist):
                 logging.info("end of playlist detected")
                 albumlist.play_next_album(prevsong['album'])
             elif currsong['pos'] != prevsong['pos']:
-                logging.debug("song change detected: prev: {0} curr: {1}".format(song_info(prevsong), song_info(currsong)))
+                logging.debug("song change detected: prev: {} curr: {}".format(song_info(prevsong), song_info(currsong)))
                 if currsong['album'] != prevsong['album']:
                     # Check that we are at the end of the last song. This is to handle the case where the user
                     # changes the current song when we're at the last song in an album
@@ -193,7 +203,7 @@ def idle_loop(client, albumlist):
                 time_song_start = time.time()
 
         except:
-            logging.error("Unexpected error: {0}\n{1}".format(sys.exc_info()[0], traceback.format_exc()))
+            logging.error("Unexpected error: {}\n{}".format(sys.exc_info()[0], traceback.format_exc()))
             albumlist.play_next_album()
 
 
@@ -216,7 +226,7 @@ def connect_mpd():
     client.connect(mpd_host, mpd_port)
     if mpd_passwd is not None:
         client.password(mpd_passwd)
-    logging.debug("MPD version: {0}".format(client.mpd_version))
+    logging.debug("MPD version: {}".format(client.mpd_version))
     #logging.debug("client.commands(): %s" % client.commands())
     return client
 
@@ -287,7 +297,7 @@ class AlbumList:
     def __init__(self, client):
         self._client = client
         if not os.path.exists(MPD_RANDOM_ALBUM_QUEUE_FILE):
-            logging.info("Creating album queue file '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
+            logging.info("Creating album queue file '{}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
             self._write_album_queue([])
 
     def _create_album_list(self, plinfo):
@@ -298,7 +308,7 @@ class AlbumList:
                 if a['album'] not in self._albums:
                     self._albums.append(a['album'])
             except KeyError:
-                logging.debug("createAlbumList, no album key, ignoring entry: {0}".format(a))
+                logging.debug("createAlbumList, no album key, ignoring entry: {}".format(a))
 
     def _create_last_song_list(self, plinfo):
         """Manages the _last_song_pos map, which maintains a last song position for each album.
@@ -311,9 +321,9 @@ class AlbumList:
             if len(entries) == 0:
                 continue
             elif len(entries) == 1:
-                logging.debug("Single file album={0}: {1}".format(a, song_info(entries[-1])))
+                logging.debug("Single file album={}: {}".format(a, song_info(entries[-1])))
             else:
-                logging.debug("Last song for album={0}: {1}".format(a, song_info(entries[-1])))
+                logging.debug("Last song for album={}: {}".format(a, song_info(entries[-1])))
 
             # pick pos from last entry that is returned
             self._last_song_pos[a] = entries[-1]['pos']
@@ -326,7 +336,7 @@ class AlbumList:
             logging.warn("No albums found")
             album_name = current_album_name
         elif len(self._albums) == 1:
-            logging.debug("only one album found: {0}".format(self._albums))
+            logging.debug("only one album found: {}".format(self._albums))
             album_name = self._albums[0]
         else:
             for i in range(0,3):
@@ -337,22 +347,29 @@ class AlbumList:
                 # lets keep trying (a few times before giving up)
                 if album_name != current_album_name:
                     break
-        logging.info("picked album: {0}".format(album_name))
+        logging.info("picked album: {}".format(album_name))
         return album_name
 
     def _write_album_queue(self, album_q_list):
         """Writes the given album queue to file. Will write an empty file if list is empty."""
-        logging.debug("Album queue: writing '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
+        logging.debug("Album queue: writing '{}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
         with open(MPD_RANDOM_ALBUM_QUEUE_FILE, 'w') as f:
             for l in album_q_list:
                 f.write(l)
 
+    def _write_album_queue_archive(self, album_name):
+        """Writes the given album name to the archive file."""
+        if MPD_RANDOM_ALBUM_QUEUE_ARCHIVE_FILE is not None and MPD_RANDOM_ALBUM_QUEUE_ARCHIVE_FILE != '':
+            logging.debug("Album queue archive: writing '{}'".format(album_name))
+            with open(MPD_RANDOM_ALBUM_QUEUE_ARCHIVE_FILE, 'a') as f:
+                f.write(album_name + '\n')
+
     def _process_album_queue(self):
         """Process the album queue file. Selects a matching album from the queue, or returns None if not found."""
         if not os.path.exists(MPD_RANDOM_ALBUM_QUEUE_FILE):
-            logging.warn("Album queue file does not exist '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
+            logging.warn("Album queue file does not exist '{}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
             return None
-        logging.info("Album queue: Scanning '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
+        logging.info("Album queue: Scanning '{}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
         with open(MPD_RANDOM_ALBUM_QUEUE_FILE) as f:
             album_q_list = f.readlines()
         if len(album_q_list) < 1:
@@ -363,18 +380,19 @@ class AlbumList:
                 for album_name in self._albums:
                     if queued_album.startswith('!'):
                         # exact match
-                        queued_album = queued_album.lstrip('!')
-                        if queued_album == album_name:
-                            logging.info("Album queue: exact matched '{0}'".format(queued_album))
+                        if queued_album.lstrip('!') == album_name:
+                            logging.info("Album queue: exact matched '{}'".format(queued_album))
+                            self._write_album_queue_archive(queued_album)
                             return album_name
                     else:
                         # substring match (default)
                         if queued_album in album_name:
-                            logging.info("Album queue: matched '{0}' in '{1}".format(queued_album, album_name))
+                            logging.info("Album queue: matched '{}' in '{}".format(queued_album, album_name))
+                            self._write_album_queue_archive(queued_album)
                             return album_name
         finally:
             self._write_album_queue(album_q_list)
-        logging.info("Album queue: No matching album found from '{0}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
+        logging.info("Album queue: No matching album found from '{}'".format(MPD_RANDOM_ALBUM_QUEUE_FILE))
         return None
 
     def refresh(self):
@@ -395,26 +413,26 @@ class AlbumList:
         if currentsong == None or len(currentsong) < 1:
             return False
         if 'album' not in currentsong:
-            logging.info("current song has no album, ignoring: {0}".format(currentsong))
+            logging.info("current song has no album, ignoring: {}".format(currentsong))
             return False
         try:
             if currentsong['pos'] == self._last_song_pos[currentsong['album']]:
-                logging.info("is last song: {0}".format(song_info(currentsong)))
+                logging.info("is last song: {}".format(song_info(currentsong)))
                 return True
         except KeyError:
-            logging.error("Caught KeyError current pos: {0}, currentsong['album']: {1}".format(currentsong['pos'],
-                                                                                               currentsong['album']))
+            logging.error("Caught KeyError current pos: {}, currentsong['album']: {}".format(currentsong['pos'],
+                                                                                             currentsong['album']))
             return False
-        logging.debug("not last song: {0}, current pos: {1} / last pos: {2}".format(song_info(currentsong),
-                                                                                    currentsong['pos'],
-                                                                                    self._last_song_pos[currentsong['album']]))
+        logging.debug("not last song: {}, current pos: {} / last pos: {}".format(song_info(currentsong),
+                                                                                 currentsong['pos'],
+                                                                                 self._last_song_pos[currentsong['album']]))
         return False
 
     def play_next_album(self, current_album_name=None):
         """Plays a random album on the current playlist.
         """
         if os.path.exists(MPD_RANDOM_SUSPEND_FILE):
-            logging.info("Suspended by presence of {0}, not choosing next album".format(MPD_RANDOM_SUSPEND_FILE))
+            logging.info("Suspended by presence of {}, not choosing next album".format(MPD_RANDOM_SUSPEND_FILE))
             return
         # choose next album, either by album queue or random
         album_name = self._process_album_queue()
@@ -427,16 +445,16 @@ class AlbumList:
         # NOTE: if the playlist is not sorted by album the results may be wonky.
         entries = self._client.playlistfind("album", album_name)
         if len(entries) < 1:
-            print("ERROR: could not find album '{0}'".format(album_name))
+            print("ERROR: could not find album '{}'".format(album_name))
             return
-        logging.debug("found entry: {0}".format(entries[0]))
+        logging.debug("found entry: {}".format(entries[0]))
         if not PASSIVE_MODE:
             # play at the playlist position of the first returned entry
             self._client.play(entries[0]['pos'])
 
     def print_debug_info(self):
-        print("Albums: {0}".format(self._albums))
-        print("Last Song Positions: {0}".format(self._last_song_pos))
+        print("Albums: {}".format(self._albums))
+        print("Last Song Positions: {}".format(self._last_song_pos))
 
 
 ###############################################################################
